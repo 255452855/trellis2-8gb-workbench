@@ -41,7 +41,7 @@ if errorlevel 1 (
 REM ---------- 2. stop the 3D backend, give VRAM/RAM to FLUX ----------
 echo.
 echo [2/5] Pausing the 3D backend to free VRAM/RAM for text-to-image ...
-wsl.exe -d Ubuntu-24.04 -- bash -lc "pkill -f 'ap[p].py' ; sleep 2 ; echo   done"
+wsl.exe -d Ubuntu-24.04 -- bash %WROOT%/_stop_3d_backend.sh
 echo.
 
 REM ---------- 3. text-to-image (prompt typed in this window) ----------
