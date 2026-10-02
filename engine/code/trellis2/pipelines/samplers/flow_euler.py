@@ -1,0 +1,255 @@
+# File: trellis2/pipelines/samplers/flow_euler.py
+# trellis2/pipelines/samplers/flow_euler.py
+from typing import *
+import torch
+import numpy as np
+from tqdm import tqdm
+from easydict import EasyDict as edict
+from .base import Sampler
+from .classifier_free_guidance_mixin import ClassifierFreeGuidanceSamplerMixin
+from .guidance_interval_mixin import GuidanceIntervalSamplerMixin
+
+
+class FlowEulerSampler(Sampler):
+    """
+    Generate samples from a flow-matching model using Euler sampling.
+
+    Args:
+        sigma_min: The minimum scale of noise in flow.
+    """
+    def __init__(
+        self,
+        sigma_min: float,
+    ):
+        self.sigma_min = sigma_min
+
+    def _eps_to_xstart(self, x_t, t, eps):
+        assert x_t.shape == eps.shape
+        return (x_t - (self.sigma_min + (1 - self.sigma_min) * t) * eps) / (1 - t)
+
+    def _xstart_to_eps(self, x_t, t, x_0):
+        assert x_t.shape == x_0.shape
+        return (x_t - (1 - t) * x_0) / (self.sigma_min + (1 - self.sigma_min) * t)
+
+    def _v_to_xstart_eps(self, x_t, t, v):
+        assert x_t.shape == v.shape
+        eps = (1 - t) * v + x_t
+        x_0 = (1 - self.sigma_min) * x_t - (self.sigma_min + (1 - self.sigma_min) * t) * v
+        return x_0, eps
+    
+    def _pred_to_xstart(self, x_t, t, pred):
+        return (1 - self.sigma_min) * x_t - (self.sigma_min + (1 - self.sigma_min) * t) * pred
+
+    def _xstart_to_pred(self, x_t, t, x_0):
+        return ((1 - self.sigma_min) * x_t - x_0) / (self.sigma_min + (1 - self.sigma_min) * t)
+
+    def _inference_model(self, model, x_t, t, cond=None, **kwargs):
+        t = torch.full((x_t.shape[0],), 1000 * t, device=x_t.device, dtype=torch.float32)
+        return model(x_t, t, cond, **kwargs)
+
+    @staticmethod
+    def _diag_value(value, label: str) -> None:
+        """Print optional finite-value diagnostics for Pixal3D debugging."""
+        import os
+
+        if not os.environ.get("PIXAL3D_STEP_DIAG"):
+            return
+        tensor = getattr(value, "feats", value)
+        if not torch.is_tensor(tensor):
+            return
+        finite = torch.isfinite(tensor)
+        finite_count = int(finite.sum().item())
+        total = tensor.numel()
+        if finite_count:
+            finite_values = tensor[finite]
+            min_value = float(finite_values.min().item())
+            max_value = float(finite_values.max().item())
+        else:
+            min_value = max_value = float("nan")
+        print(
+            f"[PIXAL3D-STEP] {label}: shape={tuple(tensor.shape)} "
+            f"dtype={tensor.dtype} finite={finite_count}/{total} "
+            f"min={min_value:.5g} max={max_value:.5g}",
+            flush=True,
+        )
+        if os.environ.get("PIXAL3D_ABORT_ON_NAN") == "1" and finite_count != total:
+            raise FloatingPointError(f"Non-finite values detected at {label}")
+
+    def _get_model_prediction(self, model, x_t, t, cond=None, **kwargs):
+        pred_v = self._inference_model(model, x_t, t, cond, **kwargs)
+        pred_x_0, pred_eps = self._v_to_xstart_eps(x_t=x_t, t=t, v=pred_v)
+        return pred_x_0, pred_eps, pred_v
+
+    @torch.no_grad()
+    def sample_once(
+        self,
+        model,
+        x_t,
+        t: float,
+        t_prev: float,
+        cond: Optional[Any] = None,
+        **kwargs
+    ):
+        """
+        Sample x_{t-1} from the model using Euler method.
+        
+        Args:
+            model: The model to sample from.
+            x_t: The [N x C x ...] tensor of noisy inputs at time t.
+            t: The current timestep.
+            t_prev: The previous timestep.
+            cond: conditional information.
+            **kwargs: Additional arguments for model inference.
+
+        Returns:
+            The predicted x_{t-1}.
+        """
+        pred_v = self._inference_model(model, x_t, t, cond, **kwargs)
+        self._diag_value(
+            pred_v,
+            f"{getattr(self, '_diag_stage', 'sampling')} model_output t={t:.6g}",
+        )
+        pred_x_prev = x_t - (t - t_prev) * pred_v
+        self._diag_value(
+            pred_x_prev,
+            f"{getattr(self, '_diag_stage', 'sampling')} sample_output t={t_prev:.6g}",
+        )
+        return pred_x_prev
+
+    @torch.no_grad()
+    def sample(
+        self,
+        model,
+        noise,
+        cond: Optional[Any] = None,
+        steps: int = 50,
+        rescale_t: float = 1.0,
+        verbose: bool = True,
+        tqdm_desc: str = "Sampling",
+        **kwargs
+    ):
+        """
+        Generate samples from the model using Euler method.
+        
+        Args:
+            model: The model to sample from.
+            noise: The initial noise tensor.
+            cond: conditional information.
+            steps: The number of steps to sample.
+            rescale_t: The rescale factor for t.
+            verbose: If True, show a progress bar.
+            tqdm_desc: A customized tqdm desc.
+            **kwargs: Additional arguments for model_inference.
+
+        Returns:
+            a dict containing the following
+            - 'samples': the model samples.
+            - 'pred_x_t': a list of prediction of x_t.
+            - 'pred_x_0': a list of prediction of x_0.
+        """
+        sample = noise
+        t_seq = np.linspace(1, 0, steps + 1)
+        t_seq = rescale_t * t_seq / (1 + (rescale_t - 1) * t_seq)
+        t_seq = t_seq.tolist()
+        t_pairs = list((t_seq[i], t_seq[i + 1]) for i in range(steps))
+        ret = edict({"samples": None})
+
+        import time as _time
+
+        for i, (t, t_prev) in enumerate(tqdm(t_pairs, desc=tqdm_desc, disable=not verbose)):
+            _t0 = _time.time()
+            self._diag_stage = tqdm_desc
+            self._diag_value(sample, f"{tqdm_desc} input step={i} t={t:.6g}")
+            # 上报进度给浏览器 UI（没设 PIXAL3D_PROGRESS 时静默跳过）
+            try:
+                import _progress
+                _progress.report(tqdm_desc, i + 1, steps)
+            except Exception:
+                pass
+            sample = self.sample_once(model, sample, t, t_prev, cond, **kwargs)
+            print(f"[TIMING] {tqdm_desc} step {i}: {_time.time()-_t0:.2f}s")
+            _time.sleep(0)  # Yield GIL to Gradio's event loop
+        ret.samples = sample
+        return ret
+
+
+class FlowEulerCfgSampler(ClassifierFreeGuidanceSamplerMixin, FlowEulerSampler):
+    """
+    Generate samples from a flow-matching model using Euler sampling with classifier-free guidance.
+    """
+    @torch.no_grad()
+    def sample(
+        self,
+        model,
+        noise,
+        cond,
+        neg_cond,
+        steps: int = 50,
+        rescale_t: float = 1.0,
+        guidance_strength: float = 3.0,
+        verbose: bool = True,
+        **kwargs
+    ):
+        """
+        Generate samples from the model using Euler method.
+        
+        Args:
+            model: The model to sample from.
+            noise: The initial noise tensor.
+            cond: conditional information.
+            neg_cond: negative conditional information.
+            steps: The number of steps to sample.
+            rescale_t: The rescale factor for t.
+            guidance_strength: The strength of classifier-free guidance.
+            verbose: If True, show a progress bar.
+            **kwargs: Additional arguments for model_inference.
+
+        Returns:
+            a dict containing the following
+            - 'samples': the model samples.
+            - 'pred_x_t': a list of prediction of x_t.
+            - 'pred_x_0': a list of prediction of x_0.
+        """
+        return super().sample(model, noise, cond, steps, rescale_t, verbose, neg_cond=neg_cond, guidance_strength=guidance_strength, **kwargs)
+
+
+class FlowEulerGuidanceIntervalSampler(GuidanceIntervalSamplerMixin, ClassifierFreeGuidanceSamplerMixin, FlowEulerSampler):
+    """
+    Generate samples from a flow-matching model using Euler sampling with classifier-free guidance and interval.
+    """
+    @torch.no_grad()
+    def sample(
+        self,
+        model,
+        noise,
+        cond,
+        neg_cond,
+        steps: int = 50,
+        rescale_t: float = 1.0,
+        guidance_strength: float = 3.0,
+        guidance_interval: Tuple[float, float] = (0.0, 1.0),
+        verbose: bool = True,
+        **kwargs
+    ):
+        """
+        Generate samples from the model using Euler method.
+        
+        Args:
+            model: The model to sample from.
+            noise: The initial noise tensor.
+            cond: conditional information.
+            neg_cond: negative conditional information.
+            steps: The number of steps to sample.
+            rescale_t: The rescale factor for t.
+            guidance_strength: The strength of classifier-free guidance.
+            guidance_interval: The interval for classifier-free guidance.
+            verbose: If True, show a progress bar.
+            **kwargs: Additional arguments for model_inference.
+
+        Returns:
+            a dict containing the following
+            - 'samples': the model samples.
+            - 'pred_x_t': a list of prediction of x_t.
+            - 'pred_x_0': a list of prediction of x_0.
+        """
+        return super().sample(model, noise, cond, steps, rescale_t, verbose, neg_cond=neg_cond, guidance_strength=guidance_strength, guidance_interval=guidance_interval, **kwargs)

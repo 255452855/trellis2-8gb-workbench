@@ -1,0 +1,91 @@
+# ─────────────────────────────────────────────────────────────────────
+# TRELLIS2 / Pixal3D 本地工作台 —— GitHub 用 .gitignore
+#
+# 原则：**只提交你自己写的代码和文档**。
+# 下面这些加起来约 42 GB，而且多数是别人的二进制/权重，绝对不能进仓库：
+#     engine/code/venv      10.3 GB   Python 虚拟环境
+#     engine/code/MODELS    31.7 GB   模型权重（另有各自的许可证）
+#     engine/tools/python    0.2 GB   内嵌 Python 运行时
+#     engine/tools/git       0.4 GB   内嵌 Git 二进制
+# ─────────────────────────────────────────────────────────────────────
+
+# ---- 1. 模型权重（体积 + 许可证问题，一律不提交）----
+engine/code/MODELS/
+**/MODELS/
+*.safetensors
+*.ckpt
+*.pth
+*.bin
+*.gguf
+*.onnx
+
+# ---- 2. 内嵌运行时 / 虚拟环境 ----
+engine/code/venv/
+engine/tools/python/
+engine/tools/git/
+bin/
+lib/
+lib64/
+include/
+pyvenv.cfg
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ---- 3. 第三方源码（各自有仓库和许可证，应作为依赖或子模块）----
+engine/code/o-voxel/third_party/
+engine/code/o-voxel/build/
+engine/tools/
+
+# ---- 4. 产物 / 日志 / 缓存 ----
+output/
+*.glb
+*.obj
+*.ply
+*.log
+engine/code/output/
+engine/code/MODELS/hub/
+engine/code/MODELS/xet/
+.tmp/
+temp/
+*.tmp
+*.incomplete
+
+# ---- 5. 本地备份与临时文件（含本人调试痕迹）----
+_backup_trellis2/
+*.bak
+*.bak-*
+.testrun/
+.workbuddy-ai/
+*.orig
+*.rej
+vcvars.log
+_disk.txt
+
+# ---- 6. 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 7. 密钥（万一有，永远别提交）----
+.env
+.env.*
+*.key
+*.pem
+secrets.json
+
+# ---- 8. 预编译轮子（几个 GB，大家自己 pip 装）----
+engine/wheels/
+engine/code/whl/
+*.whl
+
+# ---- 9. 第三方 vendored 源码 / 编译产物 ----
+engine/code/o-voxel/third_party/
+engine/code/o-voxel/build/
+engine/code/o-voxel/**.pyd
+engine/code/o-voxel/**/*.whl
+engine/code/GLTF/**
+

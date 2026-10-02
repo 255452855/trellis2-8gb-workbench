@@ -1,0 +1,44 @@
+-------------------------------------------------------------------------------
+	
+	A one-click installer for Microsoft Trellis.2
+
+	You can use either the StableProjectorz program (www.stableprojectorz.com) or a browser.
+	
+	run-projectorz folder uses my extra vram optimizations for textures, if you have the StableProjectorz program.
+	Therefore can be faster.
+
+-------------------------------------------------------------------------------
+
+	To use with StableProjectorz, go into 'run-projectorz' folder, then double click:
+
+		-  run-stableprojectorz.bat
+
+	After the window is prepared, in StableProjectorz activate the 3D mode, click on 3D connection button (bottom right corner).
+	Then, enter ip and port:   0.0.0.0    7960
+
+
+-------------------------------------------------------------------------------
+
+	To use with browser, go to run-browser folder:
+
+		-  run-gradio.bat
+	  
+	After the window is prepared, open your browser (Chrome/Edge) and type  0.0.0.0:8080  into the url, as if it was a website.		
+	  
+	  
+-------------------------------------------------------------------------------	  
+
+If you want to use my simple api, which the StableProjectorz uses - docs are in /code/api_spz/api-documentation.html
+Otherwise use the api that Trellis.2 comes with by default.
+
+
+Any questions? Join the Discord: https://discord.gg/aWbnX2qan2
+
+
+Igor Aherne 
+
+https://github.com/IgorAherne/TRELLIS.2-stableprojectorz
+https://stableprojectorz.com
+Discord: https://discord.gg/aWbnX2qan2
+
+April 2026

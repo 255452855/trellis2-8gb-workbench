@@ -1,0 +1,36 @@
+MIT License
+
+Copyright (c) Microsoft Corporation.  (microsoft/TRELLIS — original work)
+Copyright (c) Igor Aherne.          (IgorAherne/trellis-stable-projectorz — fork)
+Copyright (c) 2026 the contributors of this repository.  (local modifications)
+
+This repository is a modified derivative of the two projects above. The original
+MIT grant is reproduced below and applies to the whole repository.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
+NOTE ON MODEL WEIGHTS
+
+This license covers the SOURCE CODE only. It does NOT cover any model weights.
+
+No model weights are distributed in this repository. Every checkpoint is
+downloaded at runtime by the setup scripts from its official source, and each
+one carries its own license — for example RMBG-2.0 is non-commercial, while
+FLUX.2-klein-4B is Apache-2.0. Check each model's own license before use.

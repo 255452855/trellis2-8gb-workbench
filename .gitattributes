@@ -1,0 +1,29 @@
+# 行尾规则 —— 这个项目踩过大坑，必须钉死。
+#
+# .bat 文件**必须**是 CRLF：cmd.exe 用 LF 换行会错乱解析，把 %~dp0 拆成两半、
+# 把中文注释当命令执行。checkout 时一定要还原成 CRLF。
+# .sh 则必须是 LF，否则 bash 会报 "bad interpreter"。
+* text=auto
+
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+*.sh    text eol=lf
+*.py    text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.txt   text eol=lf
+
+# 二进制，别做行尾转换
+*.safetensors binary
+*.ckpt  binary
+*.pth   binary
+*.whl   binary
+*.exr   binary
+*.webp  binary
+*.png   binary
+*.jpg   binary
+*.pyd   binary
+*.so    binary
+*.dll   binary

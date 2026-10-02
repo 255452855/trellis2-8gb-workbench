@@ -1,0 +1,16 @@
+Hello! 
+
+I optimized tight bottlenecks in Trellis.2, to help it run locally on 8GB gpus instead of 16GB.
+
+
+You can support me here with $$:
+https://stableprojectorz.com/thanks
+
+
+Join our Discord:  
+https://discord.gg/aWbnX2qan2
+
+
+Enjoy! :)
+
+Igor Aherne
