@@ -1,3 +1,6 @@
+import os as _os
+_ROOT = _os.path.dirname(_os.path.abspath(__file__))
+
 """Numerical equivalence check: _bmm_sdpa vs PyTorch math SDPA.
 
 Run inside WSL:
@@ -9,7 +12,7 @@ import sys
 import torch
 import torch.nn.functional as F
 
-sys.path.insert(0, "/mnt/d/IDM/TRELLIS2/engine/code")
+sys.path.insert(0, "" + _ROOT + "/engine/code")
 
 torch.backends.cuda.enable_flash_sdp(False)
 torch.backends.cuda.enable_mem_efficient_sdp(False)

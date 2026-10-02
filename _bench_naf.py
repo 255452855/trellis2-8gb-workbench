@@ -1,3 +1,6 @@
+import os as _os
+_ROOT = _os.path.dirname(_os.path.abspath(__file__))
+
 """Safe measurement of NAF's VRAM peak vs target size.
 
 Only uses tiny targets (64..192) so it cannot blow up the machine, then fits
@@ -11,7 +14,7 @@ import sys
 import gc
 import torch
 
-CODE = "/mnt/d/IDM/TRELLIS2/engine/code"
+CODE = "" + _ROOT + "/engine/code"
 sys.path.insert(0, CODE)
 os.chdir(CODE)  # _load_naf looks for MODELS/NAF relative to cwd
 

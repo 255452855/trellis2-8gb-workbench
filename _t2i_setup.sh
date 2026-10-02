@@ -11,9 +11,10 @@
 # 可重复运行：已完成的步骤自动跳过。
 # 注意：文件名保持 ASCII —— 带中文的路径经 PowerShell 传给 wsl.exe 会被吃掉。
 # ─────────────────────────────────────────────────────────────────────
-VENV=/home/ccb/flux-venv
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+VENV="${FLUX_VENV:-/home/ccb/flux-venv}"
 PY="$VENV/bin/python"
-MODELS=/mnt/d/IDM/TRELLIS2/engine/code/MODELS/FLUX.2-klein-4B
+MODELS="${FLUX_MODEL_DIR:-$ROOT/engine/code/MODELS/FLUX.2-klein-4B}"
 MS_MODEL=black-forest-labs/FLUX.2-klein-4B
 IDX=https://pypi.tuna.tsinghua.edu.cn/simple
 TORCH_PIN="torch==2.6.0 torchvision==0.21.0"

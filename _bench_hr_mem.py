@@ -1,3 +1,6 @@
+import os as _os
+_ROOT = _os.path.dirname(_os.path.abspath(__file__))
+
 """Measure the HR shape model's REAL peak VRAM vs token count — safely.
 
 Only small token counts (<= 3000) are used, and the script hard-stops if free
@@ -14,7 +17,7 @@ import json
 import os
 import sys
 
-CODE = "/mnt/d/IDM/TRELLIS2/engine/code"
+CODE = "" + _ROOT + "/engine/code"
 sys.path.insert(0, CODE)
 os.environ.setdefault("ATTN_BACKEND", "sdpa")
 

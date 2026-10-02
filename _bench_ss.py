@@ -1,3 +1,6 @@
+import os as _os
+_ROOT = _os.path.dirname(_os.path.abspath(__file__))
+
 """Profile one forward of the sparse-structure flow model.
 
 Faithful to what the app actually does at load time:
@@ -16,7 +19,7 @@ import json
 import time
 import collections
 
-CODE = "/mnt/d/IDM/TRELLIS2/engine/code"
+CODE = "" + _ROOT + "/engine/code"
 sys.path.insert(0, CODE)
 os.environ.setdefault("ATTN_BACKEND", "sdpa")
 

@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import os as _os
+_ROOT = _os.path.dirname(_os.path.abspath(__file__))
+
 """通过 Gradio API 触发一次 Pixal3D 生成，验证 WSL 后端能否跑通。"""
 import sys
 import time
@@ -6,7 +9,7 @@ import time
 from gradio_client import Client, handle_file
 
 URL = "http://127.0.0.1:8080"
-IMG = ("/mnt/d/IDM/TRELLIS2/engine/code/assets/example_image/"
+IMG = ("" + _ROOT + "/engine/code/assets/example_image/"
        "0a34fae7ba57cb8870df5325b9c30ea474def1b0913c19c596655b85a79fdee4.webp")
 
 print("连接 %s ..." % URL, flush=True)

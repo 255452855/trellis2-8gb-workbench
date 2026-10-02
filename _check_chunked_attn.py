@@ -1,3 +1,6 @@
+import os as _os
+_ROOT = _os.path.dirname(_os.path.abspath(__file__))
+
 """Verify the chunked attention path is numerically equivalent to the full one.
 
 Chunking only changes HOW the [B,H,Lq,Lk] matrix is produced, never the math:
@@ -10,7 +13,7 @@ Run inside WSL:
 import os
 import sys
 
-CODE = "/mnt/d/IDM/TRELLIS2/engine/code"
+CODE = "" + _ROOT + "/engine/code"
 sys.path.insert(0, CODE)
 
 import torch  # noqa: E402

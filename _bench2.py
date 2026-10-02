@@ -1,3 +1,6 @@
+import os as _os
+_ROOT = _os.path.dirname(_os.path.abspath(__file__))
+
 """Pinpoint where the ss-forward CPU time goes.
 
 1. Per-block CUDA-event timing (30 blocks)
@@ -13,7 +16,7 @@ import sys
 import json
 import time
 
-CODE = "/mnt/d/IDM/TRELLIS2/engine/code"
+CODE = "" + _ROOT + "/engine/code"
 sys.path.insert(0, CODE)
 os.environ.setdefault("ATTN_BACKEND", "sdpa")
 

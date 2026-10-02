@@ -44,7 +44,52 @@
 双击 一键文生3D.bat      # 一句话 → GLB（首次会下约 24GB FLUX 权重）
 ```
 
-运行在 **WSL2 (Ubuntu-24.04)** 里，Python 环境 `/home/ccb/trellis2-wsl-venv`（需自建）。
+运行在 **WSL2 (Ubuntu-24.04)** 里。Python 环境 `/home/ccb/trellis2-wsl-venv`（需自建）。
+
+## ⚠️ 环境依赖：这不是「解压即用」的包
+
+**本仓库是代码快照，不含运行环境，也不含权重。** clone 下来能读到全部源码和文档，
+但要真正跑起来，还需要自己准备下面这些。请先读完再动手。
+
+### 1. 文生图环境 —— 有脚本，一键建
+
+```bash
+bash _t2i_setup.sh     # 建 /home/ccb/flux-venv + 从魔搭下 FLUX.2-klein-4B（约 24GB）
+```
+
+### 2. 3D 环境 —— **本仓库没有建它的脚本**（已知缺口）
+
+`/home/ccb/trellis2-wsl-venv` 需要你自己建，而且**不是 `pip install -r` 就能搞定**：
+除了 torch / transformers / gradio，还要编译若干带 CUDA 的扩展：
+
+| 扩展 | 用途 | 本仓库里的编译脚本 |
+|---|---|---|
+| `flex_gemm` | 稀疏卷积后端 | 无（需按上游说明编译） |
+| `natten` | NAF 邻域注意力（Pixal3D 必需） | 无 |
+| `nvdiffrast` | 可微光栅化 | `_build_nvdiff.sh` / `_build_nvdiff2.sh` |
+| `renderutils` | 渲染 | `_build_renderutils.sh` / `_build_renderutils2.sh` |
+| `cumesh` | 网格简化 | `_build_cumesh.sh` |
+
+> 这些脚本里的路径原本写死了作者机器的位置，**用之前先按自己环境改一遍**。
+
+### 3. 模型权重 —— 自动下载，但要自己确认许可证
+
+见下一节。TRELLIS.2 / Pixal3D 的权重通过界面里的「模型下载」或 `_准备环境.py` 获取。
+
+### 4. 路径可移植性
+
+主流程脚本（`_启动WSL后端.ps1`、`_t2i_*.sh`、`t2i_to_3d.py`）已改成**按脚本自身位置
+推导路径**，clone 到任意目录都能用。诊断脚本（`_bench_*.py` / `_check_*.py`）
+同样已改为 `_ROOT` 相对路径。
+
+环境位置可用环境变量覆盖：
+
+```bash
+export TRELLIS2_PY=/你的/venv/bin/python    # 3D 环境
+export FLUX_PY=/你的/flux-venv/bin/python   # 文生图环境
+export FLUX_VENV=/你的/flux-venv            # 建环境时用
+export FLUX_MODEL_DIR=/你的/FLUX.2-klein-4B # 权重位置
+```
 
 ## 模型与许可证（都不在本仓库里）
 

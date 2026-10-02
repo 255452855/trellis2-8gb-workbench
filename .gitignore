@@ -23,10 +23,12 @@ engine/code/MODELS/
 engine/code/venv/
 engine/tools/python/
 engine/tools/git/
-bin/
-lib/
-lib64/
-include/
+# 注意：根目录这几个是 venv 残留，lib64 是**符号链接**（git 当文件看待），
+# 所以这里不能写 lib64/ —— 带斜杠只匹配目录，会漏掉它。
+/bin
+/lib
+/lib64
+/include
 pyvenv.cfg
 __pycache__/
 *.py[cod]

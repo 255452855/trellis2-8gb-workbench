@@ -8,8 +8,8 @@
 #   to3d   → 只跑图生3D，用 t2i 产出的固定文件。此时后端必须已经起来。
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-PYFLUX=/home/ccb/flux-venv/bin/python
-PY3D=/home/ccb/trellis2-wsl-venv/bin/python
+PYFLUX="${FLUX_PY:-/home/ccb/flux-venv/bin/python}"
+PY3D="${TRELLIS2_PY:-/home/ccb/trellis2-wsl-venv/bin/python}"
 IMG="$ROOT/output/last-t2i.png"
 SIZE="${T2I_SIZE:-512}"
 STEPS="${T2I_STEPS:-4}"

@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import os as _os
+_ROOT = _os.path.dirname(_os.path.abspath(__file__))
+
 """一句话 → 一张图（FLUX.2-klein-4B）。
 
 **必须用文生图自己的 venv 跑**（diffusers 0.40 需要 huggingface_hub>=1.23，
@@ -18,7 +21,7 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 MODEL_DIR = os.environ.get(
     "FLUX_MODEL_DIR",
-    "/mnt/d/IDM/TRELLIS2/engine/code/MODELS/FLUX.2-klein-4B",
+    "" + _ROOT + "/engine/code/MODELS/FLUX.2-klein-4B",
 )
 
 

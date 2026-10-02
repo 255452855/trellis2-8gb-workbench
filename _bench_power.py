@@ -1,3 +1,6 @@
+import os as _os
+_ROOT = _os.path.dirname(_os.path.abspath(__file__))
+
 """Why is the GPU at 100% util but only ~70W?
 
 Runs several synthetic workloads back-to-back, printing a marker before each
@@ -11,7 +14,7 @@ import sys
 import time
 import torch
 
-CODE = "/mnt/d/IDM/TRELLIS2/engine/code"
+CODE = "" + _ROOT + "/engine/code"
 sys.path.insert(0, CODE)
 os.environ.setdefault("ATTN_BACKEND", "sdpa")
 
