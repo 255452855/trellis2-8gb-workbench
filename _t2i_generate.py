@@ -34,8 +34,11 @@ def main() -> int:
                     help="正方形边长；8GB 卡建议 512~768，越大越慢越吃显存")
     ap.add_argument("--steps", type=int, default=4, help="klein 是蒸馏模型，4 步即可")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--offload", choices=["model", "sequential", "none"], default="model",
-                    help="model=按子模型换入换出；sequential=按层，最省显存但最慢")
+    ap.add_argument("--offload", choices=["auto", "model", "sequential", "none"],
+                    default="auto",
+                    help="auto=按显存自动选（8GB 卡会选 sequential）；"
+                         "model=整块 transformer 一次搬上卡（快，但 8GB 卡放不下）；"
+                         "sequential=逐层搬（最省显存、最慢）")
     ap.add_argument("--dtype", choices=["bf16", "fp16"], default="bf16")
     a = ap.parse_args()
 
@@ -65,10 +68,25 @@ def main() -> int:
     )
     print(f"[文生图] 权重加载完成，用时 {time.time() - t0:.0f}s", flush=True)
 
-    if a.offload == "model":
+    # offload 模式：auto 按总显存选。transformer 光权重就 7.75GB(bf16)，
+    # 8GB 卡上 enable_model_cpu_offload() 会把整块一次搬上卡 —— 实测会 OOM
+    # （PyTorch 已分配 6.74GiB 还要再要 162MiB，只剩 232MiB）。
+    # sequential 是逐层搬，能稳稳跑完，代价是慢。
+    mode = a.offload
+    if mode == "auto":
+        total_gb = torch.cuda.get_device_properties(0).total_memory / 1024 ** 3
+        if total_gb >= 16:
+            mode = "none"
+        elif total_gb >= 12:
+            mode = "model"
+        else:
+            mode = "sequential"
+        print(f"[文生图] 显存 {total_gb:.1f}GB → 自动选择 offload={mode}", flush=True)
+
+    if mode == "model":
         pipe.enable_model_cpu_offload()
         print("[文生图] enable_model_cpu_offload()", flush=True)
-    elif a.offload == "sequential":
+    elif mode == "sequential":
         pipe.enable_sequential_cpu_offload()
         print("[文生图] enable_sequential_cpu_offload()（最省显存，最慢）", flush=True)
     else:
