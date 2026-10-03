@@ -12,6 +12,12 @@
 # ---- 1. 模型权重（体积 + 许可证问题，一律不提交）----
 engine/code/MODELS/
 **/MODELS/
+# ⚠️ 上面那条在 Windows 上会连 trellis2 的**源码包**一起排掉：git 的忽略规则在
+#    core.ignorecase=true（Windows 默认）下大小写不敏感，`**/MODELS/` 同样命中
+#    engine/code/trellis2/models/ —— 于是整个模型定义包从未进入仓库，别人 clone 后
+#    import trellis2 直接报"循环导入"（45 号实测：报的是 partially initialized）。
+!engine/code/trellis2/models/
+!engine/code/trellis2/models/**
 *.safetensors
 *.ckpt
 *.pth
@@ -64,6 +70,12 @@ _backup_trellis2/
 *.rej
 vcvars.log
 _disk.txt
+# 一键包在这台机器上探到的实际路径（venv/权重/CUDA/端口），换一台机器就无效，
+# 而且里面是本机绝对路径 —— 只给本地脚本读，绝不提交。
+runtime.conf
+prebuilt-wheels/
+# 打包前对现有改动的完整留底（补丁、未跟踪文件快照），不该出现在发布仓库里
+.packaging-backup/
 
 # ---- 6. 编辑器 / 系统 ----
 .vscode/
