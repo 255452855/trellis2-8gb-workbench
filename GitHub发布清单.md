@@ -81,13 +81,34 @@ MIT。模型权重适用各自许可证。
 ## 5. 发布前自检
 
 ```bat
-git init
-git add .
-git status --short | findstr /i "MODELS venv tools"   :: 应该没有任何输出
-git count-objects -vH                                   :: size-pack 别到 GB 级
+git add -A
+git status --short
+
+REM —— 三条必须看的检查 ——
+REM 1) 权重/环境/工具目录不能被收进来（engine/code/MODELS、venv、engine/tools）
+git ls-files | findstr /i "engine/code/MODELS/ engine/tools/ venv/"        :: 应该没有输出
+REM 2) 源码包 engine/code/trellis2/models 必须**在**仓库里（它是代码不是权重）。
+REM    以前 .gitignore 的 `**/MODELS/` 在 Windows 大小写不敏感，把它一起排掉了，
+REM    结果 clone 后 import trellis2 报"循环导入"。
+git ls-files engine/code/trellis2/models | find /c /v ""                    :: 应该是 7，不是 0
+REM 3) 体积：只应该有个位数十几 MB 的代码和文档
+git count-objects -vH
 ```
 
-如果 `git status` 里出现 `MODELS/`、`venv/`、`engine/tools/`，说明 `.gitignore` 没生效，**别提交**。
+⚠️ 别再用 `findstr /i "MODELS venv tools"` 做黑名单 —— 它会连源码包 `trellis2/models/`
+一起报成"违规"，反而教人把这个包删掉。按上面的路径前缀查。
+
+行尾与编码（`.gitattributes` 已经钉死，但要确认导出后仍成立）：
+
+```bat
+git ls-files --eol -- *.bat *.ps1 *.sh
+REM 期望：*.bat / *.ps1 = i/lf w/crlf（ps1 另需 UTF-8 BOM）；*.sh = i/lf w/lf
+```
+
+预编译加速包（可选，但能省别人半小时）：把 `_setup_3d_venv.sh` 编出来的
+`prebuilt-wheels/*.whl` 打成 `wheels-py312-torch2.6.0-cu124-sm61.tar`
+作为 Release 资产上传；**wheel 不进 git**（`.gitignore` 已排除 `prebuilt-wheels/`、`*.whl`）。
+
 
 ## 6. 可选：想连权重一起发
 
