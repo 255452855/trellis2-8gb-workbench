@@ -102,8 +102,18 @@ git count-objects -vH
 
 ```bat
 git ls-files --eol -- *.bat *.ps1 *.sh
-REM 期望：*.bat / *.ps1 = i/lf w/crlf（ps1 另需 UTF-8 BOM）；*.sh = i/lf w/lf
+REM 期望：*.bat / *.ps1 = i/lf w/crlf；*.sh = i/lf w/lf
 ```
+
+导出后按"文件里非 ASCII 出现在哪儿"判 BOM，别一刀切（53 号实测）：
+
+- `.ps1` 非 ASCII 出现在**要执行的语句**里（写中文标题、比较中文路径）→ **必须有 UTF-8 BOM**，
+  否则 Windows PowerShell 5.1 按 GBK 解码，中文会变问号。`_start.ps1`/`_setup_wsl.ps1`/
+  `_启动WSL后端.ps1` 都带 BOM。
+- `_start_backend.ps1` 只有注释里出现中文（`一键文生3D.bat` 这个名字），**没有 BOM 而且不该加**：
+  它是实测基线里的文件，`PSParser::Tokenize` 数出来 89 tokens / 0 errors，改动它没有任何收益。
+- `.bat` 里**不能有 UTF-8 中文**（cmd 按控制台代码页解析会错位）。`一键启动.bat`/`重启后端.bat`
+  是基线里带的 **GBK** 文件，与 `D:\IDM\TRELLIS2` 下的原件逐字节相同 —— 保持原样，别"顺手改成 UTF-8"。
 
 预编译加速包（可选，但能省别人半小时）：把 `_setup_3d_venv.sh` 编出来的
 `prebuilt-wheels/*.whl` 打成 `wheels-py312-torch2.6.0-cu124-sm61.tar`

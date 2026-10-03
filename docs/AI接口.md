@@ -8,7 +8,7 @@
 
 后端一起来就带着这个 API，`一键启动.bat` 之后直接可用。用 `gradio_client` 调。
 
-### A.1 全部 14 个端点（实测 `_probe_api.py` 输出）
+### A.1 全部 14 个端点（实测 `dev/_probe_api.py` 输出）
 
 | api_name | 作用 |
 |---|---|
@@ -49,7 +49,7 @@ auto_degrade
 
 ### A.3 已实测跑通的最小例子
 
-`_test_pixal3d.py` 就是现成的模板（本次测试跑通了 5 次）：
+`dev/_test_pixal3d.py` 就是现成的模板（本次测试跑通了 5 次）：
 
 ```python
 from gradio_client import Client, handle_file
@@ -82,13 +82,13 @@ exported, glb_path = c.predict(80, 2048, api_name="/extract_glb")
 1. **代理**：`gradio_client` 走 httpx，会读 `HTTP_PROXY/http_proxy`。本机 `.wslconfig`
    里 `autoProxy=true`，**只要 Windows 系统代理一开，WSL 里就会被注入
    `http_proxy=127.0.0.1:7897`，然后连不上 8080**（报 `httpx.ConnectTimeout`）。
-   调用前先清掉这几个变量（`_test_pixal3d.py` 的场景就是这么跑的）。
+   调用前先清掉这几个变量（`dev/_test_pixal3d.py` 的场景就是这么跑的）。
 2. **先等就绪**：端口通了只代表 Gradio 界面起来了，worker 的 pipeline 还要 15 秒左右。
    提前提交会被拒：`'模型还在加载中（约 3~4 分钟），请稍候再试。'`
    轮询 `/_runtime_panel_html` 里出现「就绪」再提交。
 3. **别用返回值判断成功与否**：失败时 `/image_to_3d` **照样返回**，只是 HTML 里是
    `<div ...>生成失败</div>` + 错误原因。要自己检查返回体里有没有「生成失败」。
-   （`_test_pixal3d.py` 没检查，所以它永远打印 `✅ 完成` —— 这是个坑。）
+   （`dev/_test_pixal3d.py` 没检查，所以它永远打印 `✅ 完成` —— 这是个坑。）
 
 ---
 
