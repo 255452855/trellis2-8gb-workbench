@@ -89,9 +89,23 @@ ls prebuilt-wheels/
 tar -cf wheels-py312-torch2.6.0-cu124-sm61.tar prebuilt-wheels/*.whl
 ```
 
-把这个 tar 作为 GitHub Release 资产上传，标签名必须与脚本探测到的 ABI 串一致
-（`py<版本>-torch<版本>-cu<版本>-sm<架构>`）。别人下载时就跳过编译；
-标签对不上会自动回退现编，**不会装错 ABI 的二进制**。
+**本仓库已经上传了这个包**，标签 `wheels-py312-torch2.6.0-cu124-sm61`，脚本在第 4 步之前
+就会自己去取，你什么都不用做（前提是显卡 sm_6x/7x 且 torch 版本正好 2.6.0+cu124；
+标签对不上会自动回退现编，**不会装错 ABI 的二进制**）。
+
+慢网络下的两个实测事实，说清楚免得你以为卡死了：
+
+- 这台机器到 GitHub Release 只有 **~30KB/s**，74MB 要 40 分钟左右 —— 和现编全套（约 35 分钟）
+  差不多打平。所以脚本不会因为"下不动"就失败：取不到就现编，取到了才省时间。
+- 下载**支持断点续传**（`curl -C -`，半成品留在 `/tmp/trellis2-build/wheels-*.tar`）。
+  一轮没下完就再双击一次 `start.bat`，它会接着上次的字节继续下，不会从头再来。
+
+想换源（比如走自己的加速通道或内网镜像）：
+
+```bash
+# 只在本次 shell 生效；也可以写进 runtime.conf 同目录的启动脚本里
+export TRELLIS2_WHEEL_URL="https://你的镜像/releases/download/wheels-py312-torch2.6.0-cu124-sm61"
+```
 
 ## ✅ 实测：从发布物一路跑到「引擎就绪」
 

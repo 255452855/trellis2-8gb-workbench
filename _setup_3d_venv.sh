@@ -142,10 +142,27 @@ wheel_of() {  # wheel_of <包名> -> 本地已有的 wheel 路径，没有则空
 _fetch_wheel_pack() {  # 下载并解包一次（多个包共用同一个 tar）
   [ -n "${WHEEL_PACK_TRIED:-}" ] && return 1
   WHEEL_PACK_TRIED=1
-  echo "  试取预编译包：$WHEEL_URL/$WHEEL_TARBALL"
-  curl -fL --retry 2 --max-time 900 -o "$WORK/$WHEEL_TARBALL" \
-    "$WHEEL_URL/$WHEEL_TARBALL" 2>/dev/null || { echo "  （没有预编译包，走现编）"; return 1; }
-  tar -xf "$WORK/$WHEEL_TARBALL" -C "$WHEEL_STORE" && echo "  预编译包已解到 $WHEEL_STORE"
+  local url="$WHEEL_URL/$WHEEL_TARBALL" out="$WORK/$WHEEL_TARBALL" rc=0
+  # 上一轮已经下完并留在这个路径里了，就别再浪费一次流量
+  if tar -tf "$out" >/dev/null 2>&1; then
+    tar -xf "$out" -C "$WHEEL_STORE" && { echo "  预编译包已解到 $WHEEL_STORE"; return 0; }
+  fi
+  # 实测（51 号）本机到 GitHub Release 只有 ~30KB/s，74MB 要 40 分钟；
+  # 现编全套反而 35 分钟就完。所以这里必须能"这一轮没下完、下一轮接着下"，
+  # 否则慢网络的机器永远拿不到预编译包：-C - 从本地已有字节数续传。
+  echo "  试取预编译包（74MB，慢网络下可分多轮续传）：$url"
+  curl -fsL --retry 3 --retry-delay 5 -C - --max-time 1800 -o "$out" "$url" 2>/dev/null || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    # 33 = 服务器拒绝 Range，说明本地这个文件已经到大小上限却是坏的，留着也没用
+    [ "$rc" = 33 ] && rm -f "$out"
+    echo "  （预编译包没取到，curl 退出码 $rc；本轮走现编。下次重跑会从断点继续下载）"
+    return 1
+  fi
+  if ! tar -xf "$out" -C "$WHEEL_STORE"; then
+    echo "  预编译包解包失败，删除残缺文件（下次重新下载）"
+    rm -f "$out"; return 1
+  fi
+  echo "  预编译包已解到 $WHEEL_STORE"
 }
 
 build_or_wheel() {  # build_or_wheel <import 名> <包名> <源码目录>
@@ -220,6 +237,10 @@ natten_official_wheel() {  # 只有 torch>=2.7 才有官方预编译 wheel
 if ! "$PY" -c 'import natten' >/dev/null 2>&1; then
   # 先查本机留档的 wheel：natten 现编实测 28 分 55 秒，是整个安装里最耗时的一步，
   # 有留档产物却不用是说不过去的。
+  # ⚠️ 先试着把留档包取回来，再判 wheel_of：wheel_of/_fetch_wheel_pack 原本只在第 5 步
+  #    才下载 Release 包，而 natten 在第 4 步 —— 结果新机器上明明有预编译 natten，
+  #    却仍然会去现编 28 分 55 秒（本机有留档时看不出来，只有空目录才暴露）。
+  [ -n "$(wheel_of natten)" ] || _fetch_wheel_pack
   NATW="$(wheel_of natten)"
   NAT="$(natten_official_wheel 2>/dev/null || true)"
   # 三条路必须是互斥的 if/elif 链：先若命中留档 wheel，就绝不能再跑一次
