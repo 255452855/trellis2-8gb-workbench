@@ -155,7 +155,9 @@ _fetch_wheel_pack() {  # 下载并解包一次（多个包共用同一个 tar）
   if [ "$rc" -ne 0 ]; then
     # 33 = 服务器拒绝 Range，说明本地这个文件已经到大小上限却是坏的，留着也没用
     [ "$rc" = 33 ] && rm -f "$out"
-    echo "  （预编译包没取到，curl 退出码 $rc；本轮走现编。下次重跑会从断点继续下载）"
+    local got=""
+    [ -f "$out" ] && got="，本地已存 $(du -m "$out" 2>/dev/null | cut -f1)MB"
+    echo "  （预编译包没取到：curl 退出码 $rc$got；本轮走现编，下次重跑会从断点继续下载）"
     return 1
   fi
   if ! tar -xf "$out" -C "$WHEEL_STORE"; then

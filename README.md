@@ -93,12 +93,15 @@ tar -cf wheels-py312-torch2.6.0-cu124-sm61.tar prebuilt-wheels/*.whl
 就会自己去取，你什么都不用做（前提是显卡 sm_6x/7x 且 torch 版本正好 2.6.0+cu124；
 标签对不上会自动回退现编，**不会装错 ABI 的二进制**）。
 
-慢网络下的两个实测事实，说清楚免得你以为卡死了：
+慢网络下的三个实测事实，说清楚免得你以为卡死了：
 
-- 这台机器到 GitHub Release 只有 **~30KB/s**，74MB 要 40 分钟左右 —— 和现编全套（约 35 分钟）
-  差不多打平。所以脚本不会因为"下不动"就失败：取不到就现编，取到了才省时间。
-- 下载**支持断点续传**（`curl -C -`，半成品留在 `/tmp/trellis2-build/wheels-*.tar`）。
-  一轮没下完就再双击一次 `start.bat`，它会接着上次的字节继续下，不会从头再来。
+- 本机到 GitHub Release 的速度在 **20~60KB/s 之间波动**，74MB 单轮要 20~40 分钟。
+  脚本给一轮设了 30 分钟上限，取不到就回退现编（全套约 35 分钟），**不会因为"下不动"而失败**。
+- 下载**支持断点续传**（`curl -C -`，半成品留在 `/tmp/trellis2-build/wheels-*.tar`）：
+  一轮没下完就再双击一次 `start.bat`，它接着上次的字节继续下，不会从头再来。
+  实测两轮补齐 —— 第一轮 13 分钟下到 24MB，第二轮从断点续传，14 分钟下完剩下 50MB
+  并把 5 个 wheel 全装上，全程零现编。
+- tar 一旦完整落到本地，解包+安装只要 **41 秒**，一次网都不上（换 venv、重装都走这条）。
 
 想换源（比如走自己的加速通道或内网镜像）：
 
@@ -117,7 +120,9 @@ export TRELLIS2_WHEEL_URL="https://你的镜像/releases/download/wheels-py312-t
 | 解压到新目录后 `--status` / `--check` | 正常，缺权重时退出码 2（启动器据此才去装） |
 | `_setup_3d_venv.sh` 从零建环境 | torch/依赖/natten/cumesh/o_voxel 全部编成；**cumesh 2 分 1 秒、o_voxel 2 分 31 秒、natten 28 分 55 秒** |
 | 九个模块自检 | `torch 2.6.0+cu124 / torchvision / gradio 6.0.1 / transformers 4.57.3 / flex_gemm / natten 0.21.0 / nvdiffrast 0.4.0 / cumesh / o_voxel` 全 OK |
-| 命中预编译 wheel 重装 | **34 秒**，日志里一句"现编"都没有 |
+| 命中本地留档 wheel 重装 | **34 秒**，日志里一句"现编"都没有 |
+| 只靠 GitHub Release 建环境（留档目录指向空目录、卸掉五个扩展） | 断点续传 **14 分 0 秒**下完 74MB，5 个 wheel 全部命中、**零现编**、九模块自检 `BAD: 无` |
+| 本地已有完整 tar、留档目录清空后重装 | **41 秒**，一次网都不上（`tar -tf` 校验通过后直接解包） |
 | 用新环境跑发布物起后端 | 端口 6 秒就绪；首页 HTTP 200（约 161 KB）；模型加载约 6 分钟（权重在 Windows 盘上走 drvfs）后状态面板显示 **就绪**，`TRELLIS.2 ✓` `Pixal3D ✓` |
 | 显存守卫 | 日志给出 `VRAM required=4371MiB`、`TRELLIS.2 低显存模式已启用，主模型按阶段读盘`（即按显存自动 CPU offload） |
 | 收尾 | 停掉后无残留 `app.py`、显存回落；作者原有环境 `import` 检查仍然完好 |
