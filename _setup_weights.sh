@@ -56,6 +56,10 @@ M="${TRELLIS2_MODELS:-$T2_CODE/MODELS}"
 PY="${TRELLIS2_PY:-}"
 WORK="${TMPDIR:-/tmp}/trellis2-weights"
 mkdir -p "$WORK" "$M"
+# ⚠️ 必须在任何分支之前（包括 --status）先把 engine/code/MODELS 指对：上面那句
+#    mkdir 会创建一个**空目录**，而加载侧找的就是它 —— 于是状态检查全绿、后端却
+#    一个权重都读不到（49 号实测）。放在这里就不会出现"检查过了但没接上"。
+t2_ensure_models_link "$M"
 
 # ── 权重放在别处时，让 engine/code/MODELS 指向它 ─────────────────────
 # 加载侧只认 engine/code/MODELS（app.py 用 __file__ 拼、feature extractor 用
@@ -122,6 +126,19 @@ missing_files() {  # missing_files <dir> <a;b;c> —— 支持 a/*.ext 这种通
   printf '%s' "$miss"
 }
 
+# item_missing —— 在 missing_files 之上加一条 Pixal3D 的实际判定：
+#   8GB 及以下的卡只需要（也只能用）Pixal3D-fp16；已经有它的人**不该**再被要求
+#   下 20.5GB 的 fp32 原件（49 号实测：--status 一直报缺，随后就会去下 20GB，
+#   小盘上还直接 t2_die）。大显存卡仍然按 fp32 原件判定。
+item_missing() {  # item_missing <名字> <目录> <必需文件串>
+  local name="$1" dir="$2" spec="$3"
+  if [ "$name" = pixal3d ] && [ ! -d "$M/Pixal3D-F32Flow-F16Decoder" ]      && [ -f "$M/Pixal3D-fp16/pipeline.json" ]; then
+    printf ''
+    return
+  fi
+  missing_files "$dir" "$spec"
+}
+
 # ── 先报状态，再决定下什么 ──────────────────────────────────────────
 t2_log "权重清单  $M"
 NEED_GB=0
@@ -131,7 +148,7 @@ while IFS= read -r line; do
   name="$(item_field "$line" 1)"
   want "$name" || continue
   dir="$M/$(item_field "$line" 2)"
-  miss="$(missing_files "$dir" "$(item_field "$line" 4)")"
+  miss="$(item_missing "$name" "$dir" "$(item_field "$line" 4)")"
   if [ -z "$miss" ]; then
     printf '  %-12s %-6s 已就绪\n' "$name" "$(item_field "$line" 5)"
   else
@@ -182,7 +199,6 @@ fi
 
 SRC_CHOSEN="$(_pick_source)"
 echo "  下载源：$SRC_CHOSEN（两个源都会自动兜底）"
-t2_ensure_models_link "$M"
 
 # ── 快照下载：目标目录直接写，断点续传 ──────────────────────────────
 # 为什么不套临时目录再移动：/mnt/d 是 drvfs，20GB 的 mv 等于整盘复制，
@@ -255,7 +271,7 @@ while IFS= read -r line; do
   case " $TODO " in *" $name "*) : ;; *) continue ;; esac
   t2_log "下载 $name"
   if pull_snapshot "$(item_field "$line" 2)" "$repo"; then
-    miss="$(missing_files "$M/$(item_field "$line" 2)" "$(item_field "$line" 4)")"
+    miss="$(item_missing "$name" "$M/$(item_field "$line" 2)" "$(item_field "$line" 4)")"
     if [ -z "$miss" ]; then t2_ok "$name 就绪"; else echo "  [FAIL] $name 下完了但仍缺：$miss"; FAILED="$FAILED $name"; fi
   else
     echo "  [FAIL] $name 两个源都没下成"
@@ -334,7 +350,7 @@ STILL=""
 while IFS= read -r line; do
   name="$(item_field "$line" 1)"
   [ -n "$name" ] && want "$name" || continue
-  miss="$(missing_files "$M/$(item_field "$line" 2)" "$(item_field "$line" 4)")"
+  miss="$(item_missing "$name" "$M/$(item_field "$line" 2)" "$(item_field "$line" 4)")"
   if [ -z "$miss" ]; then printf '  %-12s 就绪\n' "$name"
   else printf '  %-12s 仍缺:%s\n' "$name" "$miss"; STILL="$STILL $name"; fi
 done <<ITEMS

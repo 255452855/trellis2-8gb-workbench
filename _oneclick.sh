@@ -42,7 +42,20 @@ done
 # ── 状态探测：每一步一个函数，返回 0=已完成 ─────────────────────────
 has_deps()   { ! t2_base_tools_missing && [ -n "$(t2_detect_cuda_home 2>/dev/null)" ]; }
 has_venv()   { [ -x "$TRELLIS2_PY" ] && "$TRELLIS2_PY" -c "import torch, gradio" >/dev/null 2>&1; }
-has_nvdr()   { [ -x "$TRELLIS2_PY" ] && "$TRELLIS2_PY" -c "import nvdiffrec_render.renderutils" >/dev/null 2>&1; }
+has_nvdr() {
+  [ -x "$TRELLIS2_PY" ] || return 1
+  # 这里要跑一次真内核（光 import 过不算：49 号遇到过 import 成功但插件建不起来）。
+  # 但必须把 CUDA 的 stubs 目录一并给它 —— renderutils 是**运行期** JIT 的，
+  # 缺 LIBRARY_PATH 时 -lcuda 找不到 libcuda.so（WSL 里真实驱动叫 libcuda.so.1），
+  # 于是这一步判"缺"、而安装那一步判"可用"，两边自相矛盾。
+  local ch="${TRELLIS2_CUDA_HOME:-$(t2_detect_cuda_home 2>/dev/null)}"
+  CUDA_HOME="$ch"   LD_LIBRARY_PATH="$ch/lib64:$ch/lib64/stubs:/usr/lib/wsl/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"   LIBRARY_PATH="$ch/lib64:$ch/lib64/stubs:/usr/lib/wsl/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"   "$TRELLIS2_PY" - >/dev/null 2>&1 <<'NVDR'
+import torch
+from nvdiffrec_render import renderutils
+n = torch.full((1, 2, 2, 3), 0.577, device="cuda")
+renderutils.prepare_shading_normal(n, n, n, n, n, n, True, False)
+NVDR
+}
 has_weights(){ [ -f "$TRELLIS2_MODELS/TRELLIS.2-4B/pipeline.json" ] \
                && [ -d "$TRELLIS2_MODELS/dinov3" ] && [ -d "$TRELLIS2_MODELS/RMBG-2.0" ] \
                && [ -f "$TRELLIS2_MODELS/TRELLIS.2-4B/ckpts/ss_flow_img_dit_1_3B_64_bf16.safetensors" ]; }
@@ -123,33 +136,49 @@ if [ "$ASSUME_YES" != "1" ] && [ -t 0 ]; then
 fi
 
 FAILED=""
-run_step() {  # run_step <名字> <命令...>
+run_step() {  # run_step <步骤key> <显示名> <命令...>
+  local key="$1" name="$2"; shift 2
+  t2_log "$name"
+  if "$@"; then t2_ok "$name 完成"; return 0; fi
+  echo "  [FAIL] $name 失败（见上面的输出）"
+  # FAILED 只存 key（deps/venv/weights…），因为收尾会把它拼成
+  #   bash _oneclick.sh --only <FAILED>
+  # 这句重跑提示。存中文显示名的话提示会变成 "--only 3/5,PBR,材质渲染依赖,…"，
+  # 照抄必然失败（49 号实测就是这个）。
+  FAILED="$FAILED $key"
+  return 1
+}
+
+run_optional() {  # run_optional <显示名> <命令...> —— 可选依赖：失败只警告，不进 FAILED
   local name="$1"; shift
   t2_log "$name"
-  if "$@"; then t2_ok "$name 完成"; else
-    echo "  [FAIL] $name 失败（见上面的输出）"
-    FAILED="$FAILED $name"
-    return 1
+  if "$@"; then
+    t2_ok "$name 完成"
+  else
+    echo "  [降级] $name 没装成。**不影响图生3D**，页面照常用，只是材质(PBR)渲染阶段跳过。"
+    echo "         想再试一次：bash _oneclick.sh --only nvdr   或直接 bash _setup_nvdiffrec.sh"
+    echo "         （实测：安装期偶发编译失败，重跑一次即成功 —— 产物会被 torch 缓存）"
   fi
+  return 0   # 可选步骤永不阻断一键流程
 }
 
 # ── 1. 系统依赖 ─────────────────────────────────────────────────────
 if want_step deps && case " $MISSING " in *" deps "*) true ;; *) false ;; esac; then
-  run_step "1/5 WSL 系统依赖（python3-venv / build-essential / CUDA 编译器）" \
-    t2_ensure_system_deps || FAILED="$FAILED deps"
+  run_step deps "1/5 WSL 系统依赖（python3-venv / build-essential / CUDA 编译器）" \
+    t2_ensure_system_deps
 fi
 
 # ── 2. 3D 环境 ──────────────────────────────────────────────────────
 if want_step venv && case " $MISSING " in *" venv "*) true ;; *) false ;; esac; then
-  run_step "2/5 建 3D 环境（要编译 4 个 CUDA 扩展，30~60 分钟）" \
-    bash "$T2_ROOT/_setup_3d_venv.sh" --activate || FAILED="$FAILED venv"
+  run_step venv "2/5 建 3D 环境（要编译 4 个 CUDA 扩展，慢的要 30~60 分钟）" \
+    bash "$T2_ROOT/_setup_3d_venv.sh" --activate
 fi
 
 # ── 3. PBR 渲染依赖（可选，缺了也能跑图生3D）───────────────────────
 if want_step nvdr && case " $MISSING " in *" nvdr "*) true ;; *) false ;; esac; then
   if has_venv; then
-    run_step "3/5 PBR 材质渲染依赖 nvdiffrec_render" \
-      bash "$T2_ROOT/_setup_nvdiffrec.sh" || echo "  （跳过 PBR：材质渲染阶段不可用，其余正常）"
+    run_optional "3/5 PBR 材质渲染依赖 nvdiffrec_render" \
+      bash "$T2_ROOT/_setup_nvdiffrec.sh"
   else
     echo; echo "  [SKIP] 3/5 nvdiffrec_render —— 3D 环境还没建好，建好后会自动补"
   fi
@@ -158,8 +187,8 @@ fi
 # ── 4. 权重 ─────────────────────────────────────────────────────────
 if want_step weights && case " $MISSING " in *" weights "*) true ;; *) false ;; esac; then
   if has_venv; then
-    run_step "4/5 下载权重（约 33GB，8GB 卡还要本地转 fp16）" \
-      bash "$T2_ROOT/_setup_weights.sh" || FAILED="$FAILED weights"
+    run_step weights "4/5 下载权重（约 33GB，8GB 卡还要本地转 fp16）" \
+      bash "$T2_ROOT/_setup_weights.sh"
   else
     echo; echo "  [SKIP] 4/5 权重 —— 下载器在 3D 环境里，得先有它"
     FAILED="$FAILED weights"
@@ -168,8 +197,8 @@ fi
 
 # ── 5. 文生3D（FLUX）────────────────────────────────────────────────
 if [ "$WITH_FLUX" = "1" ] && want_step flux && case " $MISSING " in *" flux "*) true ;; *) false ;; esac; then
-  run_step "5/5 文生3D：FLUX.2-klein-4B 环境 + 23GB 权重" \
-    bash "$T2_ROOT/_t2i_setup.sh" || echo "  [警告] 文生3D 没装成；图生3D 不受影响，可稍后单独跑 _t2i_setup.sh"
+  run_optional "5/5 文生3D：FLUX.2-klein-4B 环境 + 23GB 权重" \
+    bash "$T2_ROOT/_t2i_setup.sh"
 fi
 
 # ── 收尾：把这次的结果写进配置，供 PowerShell / 下次启动复用 ─────────

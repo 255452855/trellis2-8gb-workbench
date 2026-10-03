@@ -40,6 +40,16 @@ export OPENCV_IO_ENABLE_OPENEXR=1
 export PYTHONUNBUFFERED=1
 export HF_HOME="$TRELLIS2_MODELS"
 
+# 加载侧找的是 engine/code/MODELS 这个**位置**。要是它是个空目录、而权重其实在
+# 别处（TRELLIS2_MODELS 指过别的盘），状态检查会全绿但 app.py 一个权重都读不到
+# （49 号实测）。这里当场接上，别让人对着"引擎启动失败"猜半天。
+if [ ! -e "$CODE/MODELS/TRELLIS.2-4B/pipeline.json" ] \
+   && [ -f "$TRELLIS2_MODELS/TRELLIS.2-4B/pipeline.json" ]; then
+  if [ -d "$CODE/MODELS" ] && [ -z "$(ls -A "$CODE/MODELS" 2>/dev/null)" ]; then
+    t2_ensure_models_link "$TRELLIS2_MODELS"
+  fi
+fi
+
 # 权重齐了才敢离线：以前无条件 HF_HUB_OFFLINE=1，缺权重的人不会看到
 # "下权重"的提示，只会看到 from_pretrained 抛出来的离线错误。
 if [ "${TRELLIS2_WEIGHTS_READY:-0}" = "1" ] || [ -f "$TRELLIS2_MODELS/TRELLIS.2-4B/pipeline.json" ]; then
